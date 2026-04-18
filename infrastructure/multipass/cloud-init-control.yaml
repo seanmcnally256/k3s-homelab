@@ -21,11 +21,6 @@ bootcmd:
   - swapoff -a
   - sed -i '/swap/d' /etc/fstab
 
-# Load required kernel modules
-modules:
-  - name: overlay
-  - name: br_netfilter
-
 write_files:
   - path: /etc/modules-load.d/k8s.conf
     content: |
