@@ -28,8 +28,8 @@ launch_vm() {
   echo "${name} ready."
 }
 
-launch_vm k3s-control  "${REPO}/cloud-init-control.yaml"
-launch_vm k3s-worker-1 "${REPO}/cloud-init-worker-1.yaml"
-launch_vm k3s-worker-2 "${REPO}/cloud-init-worker-2.yaml"
+launch_vm k3s-control  "${REPO}/cloud-init.yaml"
+launch_vm k3s-worker-1 "${REPO}/cloud-init.yaml"
+launch_vm k3s-worker-2 "${REPO}/cloud-init.yaml"
 
 multipass list

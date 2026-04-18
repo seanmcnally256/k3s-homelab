@@ -12,21 +12,39 @@ packages:
   - net-tools
   - nfs-common
   - open-iscsi
+
+# Disable swap - hard requirement for Kubernetes
 bootcmd:
   - swapoff -a
   - sed -i '/\sswap\s/d' /etc/fstab
+
 write_files:
+  # Load required kernel modules at boot
   - path: /etc/modules-load.d/k8s.conf
     content: |
       overlay
       br_netfilter
+
+  # Kubernetes networking sysctls
   - path: /etc/sysctl.d/k8s.conf
     content: |
       net.bridge.bridge-nf-call-iptables  = 1
       net.bridge.bridge-nf-call-ip6tables = 1
       net.ipv4.ip_forward                 = 1
+
+  # k3s config - applied at install time by the k3s installer
+  # flannel and traefik disabled in favour of Calico and Nginx
+  - path: /etc/rancher/k3s/config.yaml
+    content: |
+      flannel-backend: none
+      disable-network-policy: true
+      disable:
+        - traefik
+
 runcmd:
   - modprobe overlay
   - modprobe br_netfilter
   - sysctl --system
   - systemctl enable --now iscsid
+
+final_message: "cloud-init complete — node ready for k3s install"
