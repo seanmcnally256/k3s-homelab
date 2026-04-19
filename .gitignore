@@ -1,0 +1,5 @@
+# Vagrant runtime state
+.vagrant/
+
+# kubeconfig pulled from control plane after k3s install
+infrastructure/k3s/kubeconfig
