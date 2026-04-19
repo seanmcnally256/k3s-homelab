@@ -1,5 +1,14 @@
-# Vagrant runtime state
-.vagrant/
+# Terraform — state and credentials must never be committed
+terraform.tfstate
+terraform.tfstate.backup
+**/.terraform/
+**/terraform.tfstate
+**/terraform.tfstate.backup
+**/terraform.tfvars
+# .terraform.lock.hcl is intentionally committed (locks provider versions)
 
 # kubeconfig pulled from control plane after k3s install
 infrastructure/k3s/kubeconfig
+
+# Claude Code local settings (machine-specific)
+.claude/

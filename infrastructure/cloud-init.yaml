@@ -1,0 +1,37 @@
+#cloud-config
+
+hostname: ${hostname}
+fqdn:     ${hostname}
+
+ssh_pwauth: false
+disable_root: true
+
+package_update: true
+
+packages:
+  - curl
+  - git
+
+bootcmd:
+  - modprobe br_netfilter
+  - modprobe overlay
+
+write_files:
+  - path: /etc/modules-load.d/k3s.conf
+    content: |
+      br_netfilter
+      overlay
+
+  - path: /etc/sysctl.d/99-k3s.conf
+    content: |
+      net.bridge.bridge-nf-call-iptables  = 1
+      net.bridge.bridge-nf-call-ip6tables = 1
+      net.ipv4.ip_forward                 = 1
+
+runcmd:
+  - sysctl --system
+  - swapoff -a
+  - sed -i '/\sswap\s/d' /etc/fstab
+  - systemctl disable --now firewalld 2>/dev/null || true
+
+timezone: America/Chicago

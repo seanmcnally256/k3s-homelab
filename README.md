@@ -1,90 +1,77 @@
 # k3s Homelab
 
-A self-contained k3s cluster running on local VirtualBox VMs, provisioned with Vagrant.
-Clone the repo, run one script, and have a 3-node Kubernetes cluster on your machine.
+A k3s cluster running on AWS EC2, provisioned with Terraform and bootstrapped with k3sup.
 
-Designed for learning: microservices security, CNI internals, GitOps workflows, and observability.
+Designed for learning: Kubernetes internals, CNI, GitOps workflows, and observability.
 
 ---
 
 ## Prerequisites
 
-| Tool | Version tested | Install |
-|------|---------------|---------|
-| [VirtualBox](https://www.virtualbox.org/wiki/Downloads) | 7.2 | — |
-| [Vagrant](https://developer.hashicorp.com/vagrant/downloads) | 2.4 | — |
-| [Windows ADK – Deployment Tools](https://go.microsoft.com/fwlink/?linkid=2196127) | any | Required for cloud-init ISO generation (`oscdimg.exe`). After installing, add the Deployment Tools directory to your `PATH` (not the `.exe` itself). |
-
-> **Linux / macOS hosts:** `oscdimg` is Windows-only. Replace the cloud-init ISO step with `genisoimage` or use the `vagrant-cloud-init` plugin. Native support is on the roadmap.
+| Tool | Install |
+|------|---------|
+| [Terraform](https://developer.hashicorp.com/terraform/downloads) | `winget install Hashicorp.Terraform` |
+| [kubectl](https://kubernetes.io/docs/tasks/tools/) | `winget install Kubernetes.kubectl` |
+| [k3sup](https://github.com/alexellis/k3sup) | Download `k3sup.exe` and place in `~/bin` |
+| AWS account + credentials | `aws configure` after installing the [AWS CLI](https://aws.amazon.com/cli/) |
+| SSH key pair | `ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa` |
 
 ---
 
 ## Quick Start
 
 ```bash
+# 1. Clone
 git clone https://github.com/your-username/k3s-homelab.git
 cd k3s-homelab
-./scripts/node-provision.sh
+
+# 2. Provision VMs
+terraform -chdir=infrastructure/terraform init
+terraform -chdir=infrastructure/terraform apply
+
+# 3. Install k3s and Calico
+./scripts/k3s-install.sh
+
+# 4. Connect
+export KUBECONFIG=infrastructure/k3s/kubeconfig
+kubectl get nodes
 ```
 
-That's it. The script runs preflight checks and brings up all 3 VMs sequentially.
-Expect ~5–10 minutes on first run (box download + boot).
-
-### SSH into a node
-
-```bash
-vagrant ssh k3s-control
-vagrant ssh k3s-worker-1
-vagrant ssh k3s-worker-2
-```
-
-### Tear everything down
-
-```bash
-vagrant destroy -f
-```
+No config files to edit — AWS credentials come from `~/.aws/credentials` (set via `aws configure`).
 
 ---
 
 ## Cluster Layout
 
-| Node         | Role          | IP        | CPUs | RAM  |
-|--------------|---------------|-----------|------|------|
-| k3s-control  | Control Plane | 10.0.0.10 | 2    | 2 GB |
-| k3s-worker-1 | Worker        | 10.0.0.20 | 1    | 1 GB |
-| k3s-worker-2 | Worker        | 10.0.0.21 | 1    | 1 GB |
+3 EC2 instances (t3.small, Ubuntu 22.04, us-east-1):
 
-All nodes share a host-only network (`10.0.0.0/24`). NAT is added automatically by
-Vagrant so each VM can reach the internet for package installs.
+| Node         | Role          | vCPU | RAM  |
+|--------------|---------------|------|------|
+| k3s-control  | Control Plane | 2    | 2 GB |
+| k3s-worker-1 | Worker        | 2    | 2 GB |
+| k3s-worker-2 | Worker        | 2    | 2 GB |
+
+All nodes share a VPC (`10.0.0.0/16`) with public IPs for SSH/kubectl access.
+Cluster-internal communication uses private IPs within the VPC.
 
 ---
 
-## Customising the Cluster
+## Customising
 
-All tuneable parameters live in **`infrastructure/vagrant/params.rb`**:
+Sizing and region are controlled by variables in `infrastructure/terraform/variables.tf`:
 
-```ruby
-CLUSTER = {
-  box:      "bento/ubuntu-22.04",   # Vagrant box for all nodes
-  vb_group: "/k3s-homelab",         # VirtualBox GUI group name
-
-  control: {
-    count:    1,          # number of control-plane nodes
-    cpus:     2,
-    memory:   2048,       # MB
-    ip_start: "10.0.0.10",
-  },
-
-  workers: {
-    count:    2,          # number of worker nodes
-    cpus:     1,
-    memory:   1024,       # MB
-    ip_start: "10.0.0.20",
-  },
-}
+```hcl
+variable "region"                { default = "us-east-1" }
+variable "control_instance_type" { default = "t3.small" }
+variable "worker_instance_type"  { default = "t3.small" }
+variable "worker_count"          { default = 2 }
 ```
 
-Edit this file before running `node-provision.sh`. No changes needed in the Vagrantfile itself.
+Override any of them by creating a `terraform.tfvars` file (gitignored):
+
+```hcl
+worker_count = 1
+```
 
 ---
 
@@ -92,49 +79,48 @@ Edit this file before running `node-provision.sh`. No changes needed in the Vagr
 
 ```
 k3s-homelab/
-├── Vagrantfile                        VM definitions — reads from params.rb
 ├── infrastructure/
-│   └── vagrant/
-│       ├── params.rb                  Cluster topology and resource config
-│       └── cloud-init.yaml            Guest OS bootstrap (packages, timezone)
+│   ├── cloud-init.yaml        Guest OS bootstrap — kernel config, swap off
+│   ├── terraform/
+│   │   ├── main.tf            VPC, subnet, internet gateway, security group
+│   │   ├── compute.tf         Control plane + worker EC2 instances
+│   │   ├── variables.tf       All input variables with defaults
+│   │   └── outputs.tf         Public/private IPs
+│   └── k3s/                   kubeconfig written here after install (gitignored)
 ├── scripts/
-│   ├── node-provision.sh              Step 1 — preflight checks + vagrant up
-│   └── k3s-install.sh                 Step 2 — k3s install across all nodes (coming soon)
+│   └── k3s-install.sh         Bootstrap k3s across all nodes, then install Calico
 ├── manifests/
-│   ├── networking/                    Calico, Nginx ingress, cert-manager
-│   ├── storage/                       OpenEBS Local PV
-│   ├── observability/                 Alloy, Prometheus, Grafana
-│   ├── gitops/                        Flux configuration
-│   └── security/                      Falco (phase 2)
-├── apps/                              Experimental workloads
+│   ├── networking/            Nginx ingress, cert-manager
+│   ├── storage/               OpenEBS
+│   ├── observability/         Alloy, Prometheus, Grafana
+│   └── gitops/                Flux
 └── docs/
-    └── architecture.md                Deeper architecture notes and network diagram
+    └── architecture.md
 ```
 
 ---
 
-## Bring-up Roadmap
+## Roadmap
 
-- [x] VM provisioning (`node-provision.sh`)
-- [ ] k3s install — control plane + workers (`k3s-install.sh`)
-- [ ] CNI — Calico
+- [x] Infrastructure provisioning (Terraform + AWS)
+- [x] VM bootstrap (cloud-init)
+- [x] k3s install — control plane + workers (k3sup)
+- [x] CNI — Calico
 - [ ] Ingress — Nginx + cert-manager
 - [ ] Storage — OpenEBS
 - [ ] Observability — Alloy + Prometheus + Grafana
 - [ ] GitOps — Flux
-- [ ] Runtime security — Falco
 
 ---
 
 ## Troubleshooting
 
-**VM times out on boot**
-VMs are brought up sequentially (`--no-parallel`) to avoid resource contention.
-If a timeout still occurs, try running `vagrant up <node-name>` for just the failed node.
+**`k3s-install.sh` can't SSH into nodes**
+Ensure your private key is at `~/.ssh/id_rsa`, or set `SSH_KEY=/path/to/key` before running the script.
 
-**`oscdimg` not found**
-Install the Windows ADK Deployment Tools and add the directory containing `oscdimg.exe` to
-your `PATH` (e.g. `C:\Program Files (x86)\Windows Kits\10\Assessment and Deployment Kit\Deployment Tools\amd64\Oscdimg`).
-
-**Guest Additions version mismatch warning**
-Safe to ignore. Shared folders are not used by this setup.
+**Nodes stuck `NotReady`**
+Calico is applied automatically by `k3s-install.sh`. If it times out, run:
+```bash
+export KUBECONFIG=infrastructure/k3s/kubeconfig
+kubectl get pods -n kube-system
+```

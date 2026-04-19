@@ -1,0 +1,17 @@
+# Copy this file to terraform.tfvars and fill in your values.
+# terraform.tfvars is git-ignored — never commit it.
+#
+# AWS credentials are NOT stored here — configure them with:
+#   aws configure
+# or set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables.
+
+region = "us-east-1"
+
+# Paste the contents of your public key (e.g. ~/.ssh/id_rsa.pub)
+ssh_public_key = "ssh-rsa AAAA..."
+
+# Instance types — t3.micro is free tier eligible but tight (1 GB RAM)
+# t3.small (2 GB) is recommended for comfortable k3s operation
+# control_instance_type = "t3.small"
+# worker_instance_type  = "t3.small"
+# worker_count          = 2
