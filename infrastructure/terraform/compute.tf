@@ -28,7 +28,7 @@ resource "aws_instance" "control" {
   key_name               = aws_key_pair.k3s.key_name
   subnet_id              = aws_subnet.k3s.id
   vpc_security_group_ids = [aws_security_group.k3s.id]
-  user_data = templatefile("${path.module}/../cloud-init.yaml", {
+  user_data = templatefile("${path.module}/../cloud-init/cloud-init.yaml", {
     hostname = "k3s-control"
   })
 
@@ -44,7 +44,7 @@ resource "aws_instance" "workers" {
   key_name               = aws_key_pair.k3s.key_name
   subnet_id              = aws_subnet.k3s.id
   vpc_security_group_ids = [aws_security_group.k3s.id]
-  user_data = templatefile("${path.module}/../cloud-init.yaml", {
+  user_data = templatefile("${path.module}/../cloud-init/cloud-init.yaml", {
     hostname = "k3s-worker-${count.index + 1}"
   })
 

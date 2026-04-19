@@ -8,51 +8,130 @@ Designed for learning: Kubernetes internals, CNI, GitOps workflows, and observab
 
 ## Prerequisites
 
-| Tool | Install |
-|------|---------|
-| [Terraform](https://developer.hashicorp.com/terraform/downloads) | `winget install Hashicorp.Terraform` |
-| [kubectl](https://kubernetes.io/docs/tasks/tools/) | `winget install Kubernetes.kubectl` |
-| [k3sup](https://github.com/alexellis/k3sup) | Download `k3sup.exe` and place in `~/bin` |
-| AWS account + credentials | `aws configure` after installing the [AWS CLI](https://aws.amazon.com/cli/) |
-| SSH key pair | `ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa` |
+Install the following tools before starting:
+
+**Terraform**
+```bash
+winget install Hashicorp.Terraform
+```
+
+**kubectl**
+```bash
+winget install Kubernetes.kubectl
+```
+
+**AWS CLI**
+```bash
+winget install Amazon.AWSCLI
+```
+
+**k3sup** — download the binary and place it on your PATH:
+```bash
+# Download k3sup.exe from https://github.com/alexellis/k3sup/releases/latest
+# Then move it to ~/bin (or any directory on your PATH)
+mv ~/Downloads/k3sup.exe ~/bin/k3sup.exe
+```
+
+**SSH key pair** — skip if you already have one at `~/.ssh/id_rsa`:
+```bash
+ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa
+```
 
 ---
 
-## Quick Start
+## 1. Create an AWS Account
+
+1. Go to [aws.amazon.com](https://aws.amazon.com) and create a free account
+2. Once logged in, go to **IAM → Users → Create user**
+3. Give the user **AdministratorAccess** (or a scoped policy with EC2/VPC permissions)
+4. Under the user, go to **Security credentials → Create access key** — choose "CLI"
+5. Save the **Access Key ID** and **Secret Access Key**
+
+Then configure the AWS CLI with those credentials:
 
 ```bash
-# 1. Clone
+aws configure
+# AWS Access Key ID: <your access key>
+# AWS Secret Access Key: <your secret key>
+# Default region name: us-east-1
+# Default output format: json
+```
+
+This writes credentials to `~/.aws/credentials` — Terraform reads them automatically.
+
+---
+
+## 2. Provision Infrastructure
+
+Clone the repo and initialise Terraform:
+
+```bash
 git clone https://github.com/your-username/k3s-homelab.git
 cd k3s-homelab
 
-# 2. Provision VMs
 terraform -chdir=infrastructure/terraform init
+```
+
+Preview what will be created:
+
+```bash
+terraform -chdir=infrastructure/terraform plan
+```
+
+Apply — this creates the VPC, subnet, security group, and 3 EC2 instances:
+
+```bash
 terraform -chdir=infrastructure/terraform apply
+```
 
-# 3. Install k3s and Calico
+Type `yes` when prompted. Takes ~1 minute. When complete, Terraform prints the node IPs:
+
+```
+control_public_ip  = "x.x.x.x"
+worker_public_ips  = ["x.x.x.x", "x.x.x.x"]
+```
+
+---
+
+## 3. Bootstrap k3s
+
+Run the install script — it reads the IPs from Terraform, installs k3s on all nodes via k3sup, then installs Calico CNI:
+
+```bash
 ./scripts/k3s-install.sh
+```
 
-# 4. Connect
+When complete, all nodes should show `Ready`.
+
+---
+
+## 4. Connect with kubectl
+
+```bash
 export KUBECONFIG=infrastructure/k3s/kubeconfig
 kubectl get nodes
 ```
 
-No config files to edit — AWS credentials come from `~/.aws/credentials` (set via `aws configure`).
+Expected output:
+
+```
+NAME           STATUS   ROLES           AGE   VERSION
+k3s-control    Ready    control-plane   2m    v1.34.x+k3s1
+k3s-worker-1   Ready    <none>          2m    v1.34.x+k3s1
+k3s-worker-2   Ready    <none>          2m    v1.34.x+k3s1
+```
 
 ---
 
-## Cluster Layout
+## 5. Tear Down
 
-3 EC2 instances (t3.small, Ubuntu 22.04, us-east-1):
+To destroy all AWS resources:
 
-| Node         | Role          | vCPU | RAM  |
-|--------------|---------------|------|------|
-| k3s-control  | Control Plane | 2    | 2 GB |
-| k3s-worker-1 | Worker        | 2    | 2 GB |
-| k3s-worker-2 | Worker        | 2    | 2 GB |
+```bash
+terraform -chdir=infrastructure/terraform destroy
+```
 
-All nodes share a VPC (`10.0.0.0/16`) with public IPs for SSH/kubectl access.
-Cluster-internal communication uses private IPs within the VPC.
+Type `yes` when prompted. All EC2 instances, networking, and security groups are removed.
 
 ---
 
@@ -71,6 +150,7 @@ Override any of them by creating a `terraform.tfvars` file (gitignored):
 
 ```hcl
 worker_count = 1
+region       = "us-west-2"
 ```
 
 ---
@@ -80,7 +160,8 @@ worker_count = 1
 ```
 k3s-homelab/
 ├── infrastructure/
-│   ├── cloud-init.yaml        Guest OS bootstrap — kernel config, swap off
+│   ├── cloud-init/
+│   │   └── cloud-init.yaml    Guest OS bootstrap — kernel config, swap off
 │   ├── terraform/
 │   │   ├── main.tf            VPC, subnet, internet gateway, security group
 │   │   ├── compute.tf         Control plane + worker EC2 instances
@@ -116,10 +197,13 @@ k3s-homelab/
 ## Troubleshooting
 
 **`k3s-install.sh` can't SSH into nodes**
-Ensure your private key is at `~/.ssh/id_rsa`, or set `SSH_KEY=/path/to/key` before running the script.
+Ensure your private key is at `~/.ssh/id_rsa`, or set `SSH_KEY=/path/to/key` before running:
+```bash
+SSH_KEY=~/.ssh/my_key ./scripts/k3s-install.sh
+```
 
 **Nodes stuck `NotReady`**
-Calico is applied automatically by `k3s-install.sh`. If it times out, run:
+Calico is applied automatically by `k3s-install.sh`. If it times out, check pod status:
 ```bash
 export KUBECONFIG=infrastructure/k3s/kubeconfig
 kubectl get pods -n kube-system
