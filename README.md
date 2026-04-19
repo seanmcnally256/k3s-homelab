@@ -1,38 +1,34 @@
-# k3s Homelab
+# Sean's k3s Lab
 
-A k3s cluster running on AWS EC2, provisioned with Terraform and bootstrapped with k3sup.
-
-Designed for learning: Kubernetes internals, CNI, GitOps workflows, and observability.
+Follow along as I deploy a k3s cluster running on AWS EC2. This cluster serves as my playground for learning Kubernetes, Terraform, cloud-init, CNI, GitOps, Grafana, and more.
 
 ---
 
 ## Prerequisites
 
-Install the following tools before starting:
+Install the below tools before starting. I personally am using a Git Bash terminal in VS Code from my Windows laptop. You may need to tailor to your current setup, but the overall prerequisites are the same:
 
-**Terraform**
+**Terraform**:
 ```bash
 winget install Hashicorp.Terraform
 ```
 
-**kubectl**
+**kubectl**:
 ```bash
 winget install Kubernetes.kubectl
 ```
 
-**AWS CLI**
+**AWS CLI**:
 ```bash
 winget install Amazon.AWSCLI
 ```
 
-**k3sup** — download the binary and place it on your PATH:
+**k3sup** - download from https://github.com/alexellis/k3sup/releases/latest and place it on your PATH:
 ```bash
-# Download k3sup.exe from https://github.com/alexellis/k3sup/releases/latest
-# Then move it to ~/bin (or any directory on your PATH)
 mv ~/Downloads/k3sup.exe ~/bin/k3sup.exe
 ```
 
-**SSH key pair** — skip if you already have one at `~/.ssh/id_rsa`:
+**SSH key pair** - skip if you already have one at `~/.ssh/id_rsa`:
 ```bash
 ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa
 ```
@@ -41,11 +37,9 @@ ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa
 
 ## 1. Create an AWS Account
 
-1. Go to [aws.amazon.com](https://aws.amazon.com) and create a free account
-2. Once logged in, go to **IAM → Users → Create user**
-3. Give the user **AdministratorAccess** (or a scoped policy with EC2/VPC permissions)
-4. Under the user, go to **Security credentials → Create access key** — choose "CLI"
-5. Save the **Access Key ID** and **Secret Access Key**
+1. Go to [aws.amazon.com](https://aws.amazon.com) and create a free account.
+4. Under the user, go to **Security credentials → Create access key**.
+5. Save the **Access Key ID** and **Secret Access Key**.
 
 Then configure the AWS CLI with those credentials:
 
@@ -53,32 +47,32 @@ Then configure the AWS CLI with those credentials:
 aws configure
 # AWS Access Key ID: <your access key>
 # AWS Secret Access Key: <your secret key>
-# Default region name: us-east-1
+# Default region name: <your region (e.g. us-east-1)>
 # Default output format: json
 ```
 
-This writes credentials to `~/.aws/credentials` — Terraform reads them automatically.
+This writes credentials to `~/.aws/credentials`, Terraform reads them automatically.
 
 ---
 
 ## 2. Provision Infrastructure
 
-Clone the repo and initialise Terraform:
+Clone this repo and initialize Terraform:
 
 ```bash
-git clone https://github.com/your-username/k3s-homelab.git
+git clone https://github.com/seanmcnally256/k3s-homelab.git
 cd k3s-homelab
 
 terraform -chdir=infrastructure/terraform init
 ```
 
-Preview what will be created:
+Or, preview what will be created first:
 
 ```bash
 terraform -chdir=infrastructure/terraform plan
 ```
 
-Apply — this creates the VPC, subnet, security group, and 3 EC2 instances:
+Apply - this creates the VPC, subnet, security group, and 3 EC2 instances:
 
 ```bash
 terraform -chdir=infrastructure/terraform apply
@@ -95,15 +89,13 @@ worker_public_ips  = ["x.x.x.x", "x.x.x.x"]
 
 ## 3. Bootstrap k3s
 
-Run the install script — it reads the IPs from Terraform, installs k3s on all nodes via k3sup, then installs Calico CNI:
+Run the install script - it reads the IPs from Terraform, installs k3s on all nodes via k3sup and installs Calico CNI:
 
 ```bash
 ./scripts/k3s-install.sh
 ```
 
-When complete, all nodes should show `Ready`.
 
----
 
 ## 4. Connect with kubectl
 
@@ -135,7 +127,7 @@ Type `yes` when prompted. All EC2 instances, networking, and security groups are
 
 ---
 
-## Customising
+## Customizing
 
 Sizing and region are controlled by variables in `infrastructure/terraform/variables.tf`:
 
@@ -178,19 +170,6 @@ k3s-homelab/
 └── docs/
     └── architecture.md
 ```
-
----
-
-## Roadmap
-
-- [x] Infrastructure provisioning (Terraform + AWS)
-- [x] VM bootstrap (cloud-init)
-- [x] k3s install — control plane + workers (k3sup)
-- [x] CNI — Calico
-- [ ] Ingress — Nginx + cert-manager
-- [ ] Storage — OpenEBS
-- [ ] Observability — Alloy + Prometheus + Grafana
-- [ ] GitOps — Flux
 
 ---
 
