@@ -53,6 +53,12 @@ mv ~/Downloads/cloudflared-windows-amd64.exe ~/bin/cloudflared.exe
 ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa
 ```
 
+You can check and install all prerequisites automatically:
+
+```bash
+./scripts/prereqs.sh
+```
+
 ---
 
 ## 1. AWS Setup
@@ -193,6 +199,7 @@ k3s-homelab/
 │   │   └── terraform.tfvars.example
 │   └── k3s/                      kubeconfig written here after bootstrap (gitignored)
 ├── scripts/
+│   ├── prereqs.sh                Check and install all prerequisites
 │   ├── k3s-bootstrap.sh          Install k3s across all nodes + Calico CNI
 │   └── apps-bootstrap.sh         Install Argo CD, Nginx Ingress, Cloudflare Tunnel
 └── docs/
