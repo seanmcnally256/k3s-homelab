@@ -12,4 +12,4 @@ variable "ssh_public_key_path" {
 # t3.small = 1 vCPU, 2 GB — recommended for comfort
 variable "control_instance_type" { default = "t3.small" }
 variable "worker_instance_type"  { default = "t3.small" }
-variable "worker_count"          { default = 2 }
+variable "worker_count"          { default = 3 }

@@ -24,6 +24,7 @@ SSH_KEY="${SSH_KEY:-$HOME/.ssh/id_rsa}"
 SSH_KEY_WIN=$(cygpath -w "$SSH_KEY")
 SSH_USER="ubuntu"
 KUBECONFIG_OUT="infrastructure/k3s/kubeconfig"
+CALICO_VERSION="v3.29.3"
 
 [[ -d "$TERRAFORM_DIR" ]] || err "Run this script from the repo root."
 command -v terraform &>/dev/null || err "terraform not found — install it first."
@@ -80,7 +81,7 @@ done
 # ── Install Calico CNI ────────────────────────────────────────────────────────
 
 info "Installing Calico CNI..."
-KUBECONFIG="$KUBECONFIG_OUT" kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.29.3/manifests/calico.yaml
+KUBECONFIG="$KUBECONFIG_OUT" kubectl apply -f "https://raw.githubusercontent.com/projectcalico/calico/${CALICO_VERSION}/manifests/calico.yaml"
 
 info "Waiting for nodes to become Ready..."
 KUBECONFIG="$KUBECONFIG_OUT" kubectl wait --for=condition=Ready nodes --all --timeout=120s

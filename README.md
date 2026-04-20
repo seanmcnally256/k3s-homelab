@@ -23,6 +23,11 @@ winget install Kubernetes.kubectl
 winget install Amazon.AWSCLI
 ```
 
+**Helm**:
+```bash
+winget install Helm.Helm
+```
+
 **k3sup** - download from https://github.com/alexellis/k3sup/releases/latest and place it on your PATH:
 ```bash
 mv ~/Downloads/k3sup.exe ~/bin/k3sup.exe
@@ -92,7 +97,7 @@ worker_public_ips  = ["x.x.x.x", "x.x.x.x"]
 Run the install script - it reads the IPs from Terraform, installs k3s on all nodes via k3sup and installs Calico CNI:
 
 ```bash
-./scripts/k3s-install.sh
+./scripts/k3s-bootstrap.sh
 ```
 
 
@@ -161,7 +166,7 @@ k3s-homelab/
 │   │   └── outputs.tf         Public/private IPs
 │   └── k3s/                   kubeconfig written here after install (gitignored)
 ├── scripts/
-│   └── k3s-install.sh         Bootstrap k3s across all nodes, then install Calico
+│   └── k3s-bootstrap.sh         Bootstrap k3s across all nodes, then install Calico
 ├── manifests/
 │   ├── networking/            Nginx ingress, cert-manager
 │   ├── storage/               OpenEBS
@@ -175,14 +180,14 @@ k3s-homelab/
 
 ## Troubleshooting
 
-**`k3s-install.sh` can't SSH into nodes**
+**`k3s-bootstrap.sh` can't SSH into nodes**
 Ensure your private key is at `~/.ssh/id_rsa`, or set `SSH_KEY=/path/to/key` before running:
 ```bash
-SSH_KEY=~/.ssh/my_key ./scripts/k3s-install.sh
+SSH_KEY=~/.ssh/my_key ./scripts/k3s-bootstrap.sh
 ```
 
 **Nodes stuck `NotReady`**
-Calico is applied automatically by `k3s-install.sh`. If it times out, check pod status:
+Calico is applied automatically by `k3s-bootstrap.sh`. If it times out, check pod status:
 ```bash
 export KUBECONFIG=infrastructure/k3s/kubeconfig
 kubectl get pods -n kube-system

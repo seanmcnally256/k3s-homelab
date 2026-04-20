@@ -60,7 +60,7 @@ Your laptop
 terraform -chdir=infrastructure/terraform apply
 
 # 2. Install k3s + Calico across all nodes
-./scripts/k3s-install.sh
+./scripts/k3s-bootstrap.sh
 
 # 3. Connect
 export KUBECONFIG=infrastructure/k3s/kubeconfig
