@@ -1,6 +1,0 @@
-# Helm values for ingress-nginx
-# Install: helm install ingress-nginx ingress-nginx/ingress-nginx \
-#            --namespace ingress-nginx --create-namespace \
-#            -f manifests/networking/ingress-nginx/values.yaml
-
-# Using defaults for now — add overrides here as needed

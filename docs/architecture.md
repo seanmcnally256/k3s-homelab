@@ -5,6 +5,14 @@
 A lightweight k3s cluster running on AWS EC2, provisioned with Terraform and bootstrapped
 with k3sup. Goals: learning Kubernetes internals, CNI, GitOps, and observability.
 
+## Repositories
+
+| Repo | Purpose |
+|------|---------|
+| [k3s-homelab](https://github.com/seanmcnally256/k3s-homelab) | Infrastructure — Terraform, cloud-init, bootstrap script |
+| [k3s-apps](https://github.com/seanmcnally256/k3s-apps) | Cluster apps — all manifests managed by Argo CD |
+| [www-seancloud](https://github.com/seanmcnally256/www-seancloud) | Website — HTML/CSS, Dockerfile, GitHub Actions |
+
 ## Cluster Topology
 
 | Node         | Role          | Instance  | vCPU | RAM  |
@@ -21,6 +29,8 @@ Run `terraform -chdir=infrastructure/terraform output` to see current IPs.
 ## Network Design
 
 ```
+Browser → Cloudflare Edge (TLS) → cloudflared pod → Nginx Ingress → Service → Pod
+
 Your laptop
 │
 ├── SSH / kubectl (public IPs, ports 22 + 6443)
@@ -30,28 +40,27 @@ Your laptop
         ├── k3s-control   (public + private IP)
         ├── k3s-worker-1  (public + private IP)
         └── k3s-worker-2  (public + private IP)
-            │
-            └── Internet Gateway → outbound internet
 ```
 
 ## Security
 
 | Layer   | Control |
 |---------|---------|
-| Network | AWS security group — SSH (22), kubectl API (6443), all internal VPC traffic |
+| Network | AWS security group — SSH (22), kubectl API (6443), all internal VPC traffic only |
 | SSH     | Key-only auth (`ssh_pwauth: false`), root login disabled |
+| Ingress | No ports 80/443 open — all web traffic flows through Cloudflare Tunnel |
 
-## Planned Stack
+## Current Stack
 
-| Layer         | Choice                       |
-|---------------|------------------------------|
-| Infra         | Terraform + AWS              |
-| Kubernetes    | k3s (Flannel + Traefik disabled) |
-| CNI           | Calico                       |
-| Ingress       | Nginx + cert-manager         |
-| Storage       | OpenEBS Local PV             |
-| Observability | Alloy + Prometheus + Grafana |
-| GitOps        | Flux                         |
+| Layer         | Choice                          |
+|---------------|---------------------------------|
+| Infra         | Terraform + AWS                 |
+| Kubernetes    | k3s                             |
+| CNI           | Calico                          |
+| Ingress       | Nginx                           |
+| Tunnel        | Cloudflare Tunnel (cloudflared) |
+| GitOps        | Argo CD                         |
+| Cluster UI    | Headlamp                        |
 
 ## Bring-up Sequence
 
@@ -66,6 +75,13 @@ terraform -chdir=infrastructure/terraform apply
 export KUBECONFIG=infrastructure/k3s/kubeconfig
 kubectl get nodes
 
-# 4. Apply manifests in order
-#    networking → storage → observability → gitops
+# 4. Install Argo CD
+kubectl create namespace argocd
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+# 5. Create cloudflared secret and connect to Cloudflare tunnel
+kubectl create namespace cloudflared
+kubectl create secret generic cloudflared-token --namespace cloudflared --from-literal=token=<token>
+
+# 6. Point Argo CD at k3s-apps repo — everything else syncs automatically
 ```
