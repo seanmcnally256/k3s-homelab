@@ -1,0 +1,12 @@
+# Helm values for Headlamp
+# Chart: headlamp/headlamp
+# Repo:  https://headlamp-k8s.github.io/headlamp/
+
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hosts:
+    - host: headlamp.seancloud.org
+      paths:
+        - path: /
+          type: Prefix
