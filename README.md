@@ -9,7 +9,7 @@ A k3s cluster running on AWS EC2, provisioned with Terraform and bootstrapped wi
 | Repo | Purpose |
 |------|---------|
 | [k3s-homelab](https://github.com/seanmcnally256/k3s-homelab) | Infrastructure — Terraform, cloud-init, bootstrap scripts |
-| [k3s-apps](https://github.com/seanmcnally256/k3s-apps) | Cluster apps — manifests managed by Argo CD |
+| [k3s-apps](https://github.com/seanmcnally256/k3s-apps) | Cluster apps — manifests and Helm values managed by Argo CD |
 | [www-seancloud](https://github.com/seanmcnally256/www-seancloud) | Website — HTML/CSS, Dockerfile, GitHub Actions |
 
 ---
@@ -88,9 +88,11 @@ aws configure
 cloudflared tunnel login
 cloudflared tunnel route dns <tunnel-name> argo.yourdomain.com
 cloudflared tunnel route dns <tunnel-name> www.yourdomain.com
+cloudflared tunnel route dns <tunnel-name> headlamp.yourdomain.com
+cloudflared tunnel route dns <tunnel-name> falco.yourdomain.com
 ```
 
-Add additional subdomains for each service you want to expose. Point each public hostname at:
+Point each public hostname at:
 ```
 http://ingress-nginx-controller.ingress-nginx.svc.cluster.local:80
 ```
@@ -134,29 +136,40 @@ NAME           STATUS   ROLES           AGE   VERSION
 k3s-control    Ready    control-plane   2m    v1.34.x+k3s1
 k3s-worker-1   Ready    <none>          2m    v1.34.x+k3s1
 k3s-worker-2   Ready    <none>          2m    v1.34.x+k3s1
+k3s-worker-3   Ready    <none>          2m    v1.34.x+k3s1
 ```
 
 ---
 
 ## 5. Bootstrap Apps
 
-Installs Argo CD, Nginx Ingress, and Cloudflare Tunnel. Prompts for your tunnel token and Argo CD hostname:
+Installs Argo CD, Nginx Ingress, and Cloudflare Tunnel. Then deploys all apps via the App of Apps pattern:
 
 ```bash
 export KUBECONFIG=infrastructure/k3s/kubeconfig
 ./scripts/apps-bootstrap.sh
 ```
 
-When complete the script prints your Argo CD URL and login credentials.
+The script prompts for:
+- Cloudflare tunnel token
+- Argo CD hostname
+- Path to your local k3s-apps repo
+
+When complete the script prints your Argo CD URL and login credentials. Argo CD will automatically sync and deploy all apps defined in `k3s-apps/argoapps/`.
 
 ---
 
-## 6. Connect Argo CD to your apps repo
+## 6. Headlamp Auth Token
 
-In the Argo CD UI:
-1. Go to **Settings → Repositories → Connect Repo** and add your apps repo
-2. Add applications pointing at your manifest paths
-3. Everything syncs automatically from Git going forward
+Generate a token to log into Headlamp:
+
+```bash
+kubectl create serviceaccount headlamp-admin -n headlamp
+kubectl create clusterrolebinding headlamp-user-admin \
+  --clusterrole=cluster-admin \
+  --serviceaccount=headlamp:headlamp-admin
+kubectl create token headlamp-admin -n headlamp --duration=8760h
+```
 
 ---
 
@@ -167,7 +180,7 @@ terraform -chdir=infrastructure/terraform destroy
 rm infrastructure/k3s/kubeconfig
 ```
 
-All AWS resources are removed. Cloudflare tunnel and DNS records persist and will reconnect on the next rebuild.
+All AWS resources are removed. Cloudflare tunnel, DNS records, and app definitions in k3s-apps persist and will reconnect on the next rebuild.
 
 ---
 
@@ -201,7 +214,7 @@ k3s-homelab/
 ├── scripts/
 │   ├── prereqs.sh                Check and install all prerequisites
 │   ├── k3s-bootstrap.sh          Install k3s across all nodes + Calico CNI
-│   └── apps-bootstrap.sh         Install Argo CD, Nginx Ingress, Cloudflare Tunnel
+│   └── apps-bootstrap.sh         Install Argo CD, Nginx Ingress, Cloudflare Tunnel + root app
 └── docs/
     └── architecture.md
 ```
@@ -224,4 +237,13 @@ kubectl get pods -n kube-system
 Check the cloudflared tunnel is connected:
 ```bash
 kubectl logs -n cloudflared deployment/cloudflared | tail -10
+```
+
+**Headlamp shows no permissions**
+The `headlamp-admin` clusterrolebinding may have been overwritten by Helm. Recreate it:
+```bash
+kubectl create clusterrolebinding headlamp-user-admin \
+  --clusterrole=cluster-admin \
+  --serviceaccount=headlamp:headlamp-admin \
+  --dry-run=client -o yaml | kubectl apply -f -
 ```
