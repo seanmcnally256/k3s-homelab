@@ -175,6 +175,18 @@ EOF
 
 success "Argo CD ingress applied."
 
+# ── Root Argo CD App ──────────────────────────────────────────────────────────
+
+header "Deploying root Argo CD app..."
+
+read -rp "Path to k3s-apps repo (e.g. /c/Users/seanm/k3s-apps): " APPS_REPO_PATH
+[[ -z "$APPS_REPO_PATH" ]] && err "Apps repo path is required."
+[[ ! -f "${APPS_REPO_PATH}/bootstrap/root-app.yaml" ]] && err "root-app.yaml not found at ${APPS_REPO_PATH}/bootstrap/root-app.yaml"
+
+kubectl apply -f "${APPS_REPO_PATH}/bootstrap/root-app.yaml"
+
+success "Root app deployed. Argo CD will sync all apps from k3s-apps/argoapps/ automatically."
+
 # ── Done ──────────────────────────────────────────────────────────────────────
 
 ARGOCD_PASSWORD=$(kubectl get secret argocd-initial-admin-secret -n argocd \
@@ -188,6 +200,5 @@ echo -e "  Argo CD URL      : ${CYAN}https://${ARGOCD_HOSTNAME}${NC}"
 echo -e "  Argo CD username : ${CYAN}admin${NC}"
 echo -e "  Argo CD password : ${CYAN}${ARGOCD_PASSWORD}${NC}"
 echo ""
-warn "Connect Argo CD to your apps repo and add your applications."
 echo -e "${BOLD}────────────────────────────────────────${NC}"
 echo ""
